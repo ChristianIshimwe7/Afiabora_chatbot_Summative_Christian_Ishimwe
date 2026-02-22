@@ -1,22 +1,33 @@
 import sys
 import subprocess
+import os
 
-# Diagnostic: check transformers installation
+# ---------- Diagnostic: check transformers installation ----------
+print("Python executable:", sys.executable, file=sys.stderr)
+print("sys.path:", sys.path, file=sys.stderr)
+
+# Check for a local transformers.py that would shadow the package
+local_files = [f for f in os.listdir('.') if f.endswith('.py') and 'transformers' in f]
+if local_files:
+    print("WARNING: Found local file(s) that may shadow transformers:", local_files, file=sys.stderr)
+    print("Please delete these files and redeploy.", file=sys.stderr)
+
 try:
     import transformers
     print("transformers version:", transformers.__version__, file=sys.stderr)
-    print("transformers path:", transformers.__file__, file=sys.stderr)
+    print("transformers file path:", transformers.__file__, file=sys.stderr)
 except ImportError as e:
     print("transformers import failed:", e, file=sys.stderr)
-    print("Attempting to reinstall transformers...", file=sys.stderr)
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "transformers"])
+    print("Attempting to force reinstall...", file=sys.stderr)
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "transformers"])
     import transformers
+    print("Reinstall successful, new path:", transformers.__file__, file=sys.stderr)
 
+# ---------- Now continue with normal imports ----------
 import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
-import os
 import traceback
 
 # -------------------- Page Configuration --------------------
@@ -80,10 +91,12 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 if prompt := st.chat_input("Ask your question here..."):
+    # Append user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # Construct the prompt exactly as during training
     prompt_text = f"""### Instruction:
 You are Afiabora-Med, a maternal and child health assistant. Provide accurate, helpful information based on WHO and Rwanda MOH guidelines.
 
@@ -93,6 +106,7 @@ You are Afiabora-Med, a maternal and child health assistant. Provide accurate, h
 ### Response:
 """
 
+    # Tokenize and generate
     inputs = tokenizer(prompt_text, return_tensors="pt").to("cpu")
     with torch.no_grad():
         outputs = model.generate(
@@ -103,12 +117,14 @@ You are Afiabora-Med, a maternal and child health assistant. Provide accurate, h
             pad_token_id=tokenizer.eos_token_id
         )
 
+    # Decode and clean the answer
     full_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
     if "### Response:" in full_response:
         answer = full_response.split("### Response:")[-1].strip()
     else:
         answer = full_response.strip()
 
+    # Append assistant message
     st.session_state.messages.append({"role": "assistant", "content": answer})
     with st.chat_message("assistant"):
         st.markdown(answer)
