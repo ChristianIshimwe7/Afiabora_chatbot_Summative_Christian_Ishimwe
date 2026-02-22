@@ -32,8 +32,8 @@ def load_model():
         # ---- Base model on CPU with float32 ----
         base_model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            device_map="cpu",               # force CPU (HF Spaces free tier)
-            torch_dtype=torch.float32,      # float32 works on all CPUs
+            device_map="cpu",
+            torch_dtype=torch.float32,
             trust_remote_code=True
         )
 
@@ -52,7 +52,7 @@ def load_model():
     except Exception as e:
         st.error(f"❌ Failed to load model:\n{str(e)}")
         st.code(traceback.format_exc())
-        st.stop()   # halt execution
+        st.stop()
 
 # Load the model (runs once and caches)
 tokenizer, model = load_model()
@@ -69,11 +69,11 @@ for msg in st.session_state.messages:
 
 # User input
 if prompt := st.chat_input("Ask your question here..."):
-OBOBOB    # Append user message
+    # Append user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-OBOBOB
+
     # Construct the prompt exactly as during training
     prompt_text = f"""### Instruction:
 You are Afiabora-Med, a maternal and child health assistant. Provide accurate, helpful information based on WHO and Rwanda MOH guidelines.
@@ -89,7 +89,7 @@ You are Afiabora-Med, a maternal and child health assistant. Provide accurate, h
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=150,                # shorter responses = faster
+            max_new_tokens=150,
             temperature=0.3,
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id
