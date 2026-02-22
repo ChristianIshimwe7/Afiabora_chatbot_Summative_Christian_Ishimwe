@@ -1,3 +1,17 @@
+import sys
+import subprocess
+
+# Diagnostic: check transformers installation
+try:
+    import transformers
+    print("transformers version:", transformers.__version__, file=sys.stderr)
+    print("transformers path:", transformers.__file__, file=sys.stderr)
+except ImportError as e:
+    print("transformers import failed:", e, file=sys.stderr)
+    print("Attempting to reinstall transformers...", file=sys.stderr)
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "transformers"])
+    import transformers
+
 import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -8,11 +22,11 @@ import traceback
 # -------------------- Page Configuration --------------------
 st.set_page_config(
     page_title="Afiabora-Med",
-    page_icon="🤰",
+    page_icon="",
     layout="centered"
 )
 
-st.title("🤰 Afiabora-Med: Maternal & Newborn Health Assistant")
+st.title("Afiabora-Med: Maternal & Newborn Health Assistant")
 st.markdown("""
 Ask questions about pregnancy, newborn care, and congenital anomaly prevention.  
 Based on WHO and Rwanda Ministry of Health guidelines.
@@ -46,11 +60,11 @@ def load_model():
         model = PeftModel.from_pretrained(base_model, lora_path)
         model.eval()
 
-        st.success("✅ Model loaded successfully!")
+        st.success("Model loaded successfully!")
         return tokenizer, model
 
     except Exception as e:
-        st.error(f"❌ Failed to load model:\n{str(e)}")
+        st.error(f"Failed to load model:\n{str(e)}")
         st.code(traceback.format_exc())
         st.stop()
 
@@ -58,23 +72,18 @@ def load_model():
 tokenizer, model = load_model()
 
 # -------------------- Chat Interface --------------------
-# Initialise session state for chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# User input
 if prompt := st.chat_input("Ask your question here..."):
-    # Append user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Construct the prompt exactly as during training
     prompt_text = f"""### Instruction:
 You are Afiabora-Med, a maternal and child health assistant. Provide accurate, helpful information based on WHO and Rwanda MOH guidelines.
 
@@ -84,7 +93,6 @@ You are Afiabora-Med, a maternal and child health assistant. Provide accurate, h
 ### Response:
 """
 
-    # Tokenize and generate
     inputs = tokenizer(prompt_text, return_tensors="pt").to("cpu")
     with torch.no_grad():
         outputs = model.generate(
@@ -95,14 +103,12 @@ You are Afiabora-Med, a maternal and child health assistant. Provide accurate, h
             pad_token_id=tokenizer.eos_token_id
         )
 
-    # Decode and clean the answer
     full_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
     if "### Response:" in full_response:
         answer = full_response.split("### Response:")[-1].strip()
     else:
         answer = full_response.strip()
 
-    # Append assistant message
     st.session_state.messages.append({"role": "assistant", "content": answer})
     with st.chat_message("assistant"):
         st.markdown(answer)
